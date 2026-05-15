@@ -79,6 +79,8 @@ object VoiceMessageDefaults {
             playIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
             playIconBackgroundColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
             durationTextColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+            speedChipColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
+            speedChipContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         VoiceMessageRole.Receiver -> VoiceMessageBubbleColors(
             bubbleColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -87,8 +89,25 @@ object VoiceMessageDefaults {
             playIconColor = MaterialTheme.colorScheme.primary,
             playIconBackgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
             durationTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            speedChipColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f),
+            speedChipContentColor = MaterialTheme.colorScheme.onSurface,
         )
     }
+
+    /**
+     * WhatsApp-style playback-speed cycle: 1× → 1.5× → 2× → 1×. Pure helper so a button-tap
+     * handler can just call `onPlaybackSpeedChange(VoiceMessageDefaults.nextPlaybackSpeed(current))`.
+     */
+    fun nextPlaybackSpeed(current: Float): Float = when {
+        current < 1.25f -> 1.5f
+        current < 1.75f -> 2f
+        else -> 1f
+    }
+
+    /** Formats a playback-speed multiplier as a short label: `1×`, `1.5×`, `2×`. */
+    fun formatPlaybackSpeed(speed: Float): String =
+        if (speed == speed.toInt().toFloat()) "${speed.toInt()}×"
+        else "${speed}×"
 }
 
 /** Formats a [Duration] as `m:ss` or `mm:ss` for display in the recorder timer / bubble. */

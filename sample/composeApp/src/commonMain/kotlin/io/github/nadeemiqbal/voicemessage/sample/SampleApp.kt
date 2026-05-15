@@ -96,6 +96,33 @@ private fun ChatScreen() {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
+    // Single-track playback: only one bubble plays at a time. Toggling another pauses any current.
+    var currentlyPlayingId by remember { mutableStateOf<Int?>(null) }
+    val progresses = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
+    val speeds = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
+
+    // Playback simulator — drives the progress of whichever bubble is currently playing, at the
+    // currently-selected speed (cycled via the speed chip). When progress hits 1f, playback
+    // resets and the bubble returns to Idle.
+    LaunchedEffect(currentlyPlayingId) {
+        val id = currentlyPlayingId ?: return@LaunchedEffect
+        val msg = messages.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        val totalMs = msg.duration.inWholeMilliseconds.coerceAtLeast(500L)
+        val stepMs = 50L
+        while (currentlyPlayingId == id) {
+            delay(stepMs)
+            val speed = speeds[id] ?: 1f
+            val current = progresses[id] ?: 0f
+            val next = (current + (stepMs.toFloat() * speed) / totalMs).coerceAtMost(1f)
+            progresses[id] = next
+            if (next >= 1f) {
+                progresses[id] = 0f
+                currentlyPlayingId = null
+                break
+            }
+        }
+    }
+
     val recorderState = rememberVoiceRecorderState(
         onCancel = { /* nothing to do — sample has no audio file to delete */ },
         onSend = { duration, samples ->
@@ -176,7 +203,19 @@ private fun ChatScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = if (msg.role == VoiceMessageRole.Sender) Arrangement.End else Arrangement.Start,
                 ) {
-                    PlayableVoiceBubble(message = msg)
+                    VoiceMessageBubble(
+                        samples = msg.samples,
+                        duration = msg.duration,
+                        isPlaying = currentlyPlayingId == msg.id,
+                        progress = progresses[msg.id] ?: 0f,
+                        onPlayPauseToggle = {
+                            currentlyPlayingId = if (currentlyPlayingId == msg.id) null else msg.id
+                        },
+                        onSeek = { f -> progresses[msg.id] = f.coerceIn(0f, 1f) },
+                        role = msg.role,
+                        playbackSpeed = speeds[msg.id] ?: 1f,
+                        onPlaybackSpeedChange = { newSpeed -> speeds[msg.id] = newSpeed },
+                    )
                 }
             }
         }
@@ -217,36 +256,6 @@ private fun ChatScreen() {
                 .padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }
-}
-
-@Composable
-private fun PlayableVoiceBubble(message: FakeVoiceMessage) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(isPlaying, message.id, message.duration) {
-        if (!isPlaying) return@LaunchedEffect
-        val totalMs = message.duration.inWholeMilliseconds.coerceAtLeast(500L)
-        val stepMs = 50L
-        while (isPlaying && progress < 1f) {
-            delay(stepMs)
-            progress = (progress + stepMs.toFloat() / totalMs).coerceAtMost(1f)
-        }
-        if (progress >= 1f) {
-            isPlaying = false
-            progress = 0f
-        }
-    }
-
-    VoiceMessageBubble(
-        samples = message.samples,
-        duration = message.duration,
-        isPlaying = isPlaying,
-        progress = progress,
-        onPlayPauseToggle = { isPlaying = !isPlaying },
-        onSeek = { f -> progress = f.coerceIn(0f, 1f) },
-        role = message.role,
-    )
 }
 
 private fun randomSamples(seed: Int, count: Int, minAmp: Float, maxAmp: Float): List<Float> {

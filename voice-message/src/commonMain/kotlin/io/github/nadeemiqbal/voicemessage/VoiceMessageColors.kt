@@ -98,6 +98,8 @@ class VoiceMessageBubbleColors(
     val playIconColor: Color,
     val playIconBackgroundColor: Color,
     val durationTextColor: Color,
+    val speedChipColor: Color,
+    val speedChipContentColor: Color,
 ) {
     fun copy(
         bubbleColor: Color = this.bubbleColor,
@@ -106,9 +108,12 @@ class VoiceMessageBubbleColors(
         playIconColor: Color = this.playIconColor,
         playIconBackgroundColor: Color = this.playIconBackgroundColor,
         durationTextColor: Color = this.durationTextColor,
+        speedChipColor: Color = this.speedChipColor,
+        speedChipContentColor: Color = this.speedChipContentColor,
     ): VoiceMessageBubbleColors = VoiceMessageBubbleColors(
         bubbleColor, playedBarColor, unplayedBarColor,
         playIconColor, playIconBackgroundColor, durationTextColor,
+        speedChipColor, speedChipContentColor,
     )
 
     override fun equals(other: Any?): Boolean {
@@ -119,7 +124,9 @@ class VoiceMessageBubbleColors(
             unplayedBarColor == other.unplayedBarColor &&
             playIconColor == other.playIconColor &&
             playIconBackgroundColor == other.playIconBackgroundColor &&
-            durationTextColor == other.durationTextColor
+            durationTextColor == other.durationTextColor &&
+            speedChipColor == other.speedChipColor &&
+            speedChipContentColor == other.speedChipContentColor
     }
 
     override fun hashCode(): Int {
@@ -129,6 +136,8 @@ class VoiceMessageBubbleColors(
         r = 31 * r + playIconColor.hashCode()
         r = 31 * r + playIconBackgroundColor.hashCode()
         r = 31 * r + durationTextColor.hashCode()
+        r = 31 * r + speedChipColor.hashCode()
+        r = 31 * r + speedChipContentColor.hashCode()
         return r
     }
 }

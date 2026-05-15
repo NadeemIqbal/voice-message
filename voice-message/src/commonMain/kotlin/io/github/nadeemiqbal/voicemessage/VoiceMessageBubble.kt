@@ -63,7 +63,13 @@ fun VoiceMessageBubble(
     role: VoiceMessageRole = VoiceMessageRole.Sender,
     colors: VoiceMessageBubbleColors = VoiceMessageDefaults.bubbleColors(role),
     barCount: Int = VoiceMessageDefaults.BarCount,
+    playbackSpeed: Float = 1f,
+    onPlaybackSpeedChange: (Float) -> Unit = {},
 ) {
+    // The speed chip appears once playback has started (mirrors WhatsApp). Before that, the
+    // duration label sits in the same slot.
+    val showSpeedChip = isPlaying || progress > 0f
+
     Row(
         modifier = modifier
             .background(colors.bubbleColor, RoundedCornerShape(20.dp))
@@ -103,11 +109,43 @@ fun VoiceMessageBubble(
             )
         }
 
+        if (showSpeedChip) {
+            SpeedChip(
+                speed = playbackSpeed,
+                contentColor = colors.speedChipContentColor,
+                backgroundColor = colors.speedChipColor,
+                onCycle = { onPlaybackSpeedChange(VoiceMessageDefaults.nextPlaybackSpeed(playbackSpeed)) },
+            )
+        } else {
+            Text(
+                text = formatVoiceDuration(duration),
+                color = colors.durationTextColor,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.width(38.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpeedChip(
+    speed: Float,
+    contentColor: Color,
+    backgroundColor: Color,
+    onCycle: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .background(backgroundColor, RoundedCornerShape(10.dp))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onCycle() }) }
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .testTag("voice_message_speed_chip"),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(
-            text = formatVoiceDuration(duration),
-            color = colors.durationTextColor,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.width(38.dp),
+            text = VoiceMessageDefaults.formatPlaybackSpeed(speed),
+            color = contentColor,
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }

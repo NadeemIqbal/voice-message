@@ -8,7 +8,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,11 +41,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.time.Duration
 
 /**
@@ -240,23 +244,58 @@ private fun MicButton(
             .background(bgColor)
             .testTag("voice_mic_button")
             .pointerInput(state, lockThresholdPx, cancelThresholdPx) {
-                var dragX = 0f
-                var dragY = 0f
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        dragX = 0f
-                        dragY = 0f
-                        state.start()
-                    },
-                    onDrag = { change, drag ->
-                        dragX += drag.x
-                        dragY += drag.y
-                        state.updateDrag(dragX, dragY, lockThresholdPx, cancelThresholdPx)
-                        change.consume()
-                    },
-                    onDragEnd = { state.release() },
-                    onDragCancel = { state.forceCancel() },
-                )
+                // Custom hold-to-record gesture. The built-in `detectDragGesturesAfterLongPress`
+                // cancels its long-press timer on the slightest pointer movement (including the
+                // sub-pixel mouse jitter most desktop pointers produce), which made the gesture
+                // unusable on Desktop and Web. Here we own the timer ourselves: a launched
+                // coroutine sleeps `viewConfiguration.longPressTimeoutMillis`, then calls
+                // `state.start()` unconditionally — drag deltas only start to flow into
+                // `state.updateDrag` after the long-press has fired, so jitter during the hold
+                // is harmless.
+                val longPressMs = viewConfiguration.longPressTimeoutMillis
+                // `PointerInputScope` is suspend but not a `CoroutineScope` — wrap in
+                // `coroutineScope { ... }` so we can `launch` the long-press timer alongside the
+                // gesture loop. When the modifier is recomposed or removed, the parent
+                // cancellation propagates through both children automatically.
+                coroutineScope {
+                    val scope = this
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var dragX = 0f
+                        var dragY = 0f
+                        var started = false
+
+                        val longPressJob = scope.launch {
+                            delay(longPressMs)
+                            started = true
+                            state.start()
+                        }
+
+                        try {
+                            // Loop until the tracked pointer goes up or out of scope.
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    // Pointer released.
+                                    break
+                                }
+                                if (started) {
+                                    val delta = change.positionChange()
+                                    dragX += delta.x
+                                    dragY += delta.y
+                                    state.updateDrag(dragX, dragY, lockThresholdPx, cancelThresholdPx)
+                                    change.consume()
+                                }
+                            }
+                        } finally {
+                            longPressJob.cancel()
+                            if (started) {
+                                state.release()
+                            }
+                        }
+                    }
+                }
             },
         contentAlignment = Alignment.Center,
     ) {

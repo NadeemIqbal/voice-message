@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-05-15
+## [0.1.0] - 2026-05-16
 
 ### Added
 - Initial release of `VoiceMessage` for Compose Multiplatform.
 - `VoiceRecorderInput` — hold-to-record mic with the full WhatsApp/Telegram gesture
-  choreography:
+  choreography. Works on **touch AND mouse / trackpad** — the long-press detector ignores
+  pointer jitter during the hold (the built-in `detectDragGesturesAfterLongPress` cancelled on
+  any movement, breaking Desktop usage):
   - Long-press to start recording.
   - Slide up past the lock threshold to lock hands-free.
   - Slide left past the cancel threshold to enter the cancelling state.
@@ -21,7 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `maxDuration` auto-finish (default 5 min).
   - `minDuration` discard (releases shorter than 500 ms are silently dropped).
 - `VoiceMessageBubble` — chat-bubble playback with tap-to-seek waveform, play/pause button,
-  duration label, and sender/receiver visual variants.
+  duration label, and sender/receiver visual variants. Optional **playback-speed chip**
+  (1× / 1.5× / 2×) that appears once playback has started — drive it via the `playbackSpeed` +
+  `onPlaybackSpeedChange` parameters. Helpers `VoiceMessageDefaults.nextPlaybackSpeed` and
+  `formatPlaybackSpeed` cycle and format the value for you.
 - `VoiceWaveform` — shared amplitude visualization primitive used by both composables, with
   optional `progress`-driven played / unplayed bar split.
 - `VoiceRecorderState` + `rememberVoiceRecorderState` — exposes `phase`, `elapsed`,
