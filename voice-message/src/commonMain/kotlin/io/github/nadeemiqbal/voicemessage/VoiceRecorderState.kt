@@ -153,8 +153,9 @@ class VoiceRecorderState internal constructor(
         samplesState.clear()
         elapsedState = Duration.ZERO
         startMark = null
-        // Briefly surface Sent so consumers can observe the delivery; next start() resets to RecordingHeld.
-        phaseState = VoicePhase.Sent
+        // Reset to Idle before firing the callback so any observer that re-reads `phase` from
+        // inside `onSend` sees the resting state, not a stuck terminal phase.
+        phaseState = VoicePhase.Idle
         onSend(dur, captured)
     }
 

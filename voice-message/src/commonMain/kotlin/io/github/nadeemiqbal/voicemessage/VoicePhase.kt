@@ -1,25 +1,23 @@
 package io.github.nadeemiqbal.voicemessage
 
 /**
- * The five states of the [VoiceRecorderInput] gesture state machine.
+ * The four states of the [VoiceRecorderInput] gesture state machine.
  *
- * - [Idle] — nothing is happening; the mic icon is at rest.
- * - [RecordingHeld] — the user is pressing the mic and recording is in progress; slide hints
+ * - [Idle]: nothing is happening; the mic icon is at rest. Also the resting state after a
+ *   successful send or cancel: the `onSend` / `onCancel` callback is the delivery contract,
+ *   there is no separate "Sent" phase to observe.
+ * - [RecordingHeld]: the user is pressing the mic and recording is in progress; slide hints
  *   (up = lock, sideways = cancel) are visible and the live amplitude waveform scrolls.
- * - [RecordingLocked] — the user slid past the lock threshold and lifted; recording continues
+ * - [RecordingLocked]: the user slid past the lock threshold and lifted; recording continues
  *   hands-free with a dedicated Send + Cancel button pair.
- * - [Cancelling] — the user slid past the cancel threshold while still holding; releasing now
+ * - [Cancelling]: the user slid past the cancel threshold while still holding; releasing now
  *   throws the recording away. Sliding back below the threshold returns to [RecordingHeld].
- * - [Sent] — terminal state for one recording: the consumer has been handed the duration and
- *   the captured amplitude samples and is expected to ship the audio file. The state machine
- *   resets to [Idle] on the next recording.
  */
 enum class VoicePhase {
     Idle,
     RecordingHeld,
     RecordingLocked,
     Cancelling,
-    Sent,
 }
 
 /**

@@ -212,7 +212,8 @@ class VoiceMessageLogicTest {
         val (dur, samples) = requireNotNull(sent) { "onSend should have fired" }
         assertEquals(800.milliseconds, dur)
         assertEquals(listOf(0.4f, 0.7f), samples)
-        assertEquals(VoicePhase.Sent, state.phase)
+        // v0.2: phase resets to Idle immediately after onSend.
+        assertEquals(VoicePhase.Idle, state.phase)
     }
 
     @Test
@@ -286,7 +287,8 @@ class VoiceMessageLogicTest {
         time += 2.seconds
         state.tick()
         assertEquals(2.seconds, sent)
-        assertEquals(VoicePhase.Sent, state.phase)
+        // v0.2: phase resets to Idle immediately after onSend.
+        assertEquals(VoicePhase.Idle, state.phase)
     }
 
     @Test
@@ -311,14 +313,15 @@ class VoiceMessageLogicTest {
     }
 
     @Test
-    fun state_startCanRecoverFromSent() {
+    fun state_afterSend_phaseResetsToIdle() {
         val time = TestTimeSource()
         val state = newState(time = time)
         state.start()
         time += 1.seconds
         state.tick()
         state.release()
-        assertEquals(VoicePhase.Sent, state.phase)
+        // v0.2: phase resets to Idle synchronously after onSend (no stuck Sent phase).
+        assertEquals(VoicePhase.Idle, state.phase)
         state.start()
         assertEquals(VoicePhase.RecordingHeld, state.phase)
     }

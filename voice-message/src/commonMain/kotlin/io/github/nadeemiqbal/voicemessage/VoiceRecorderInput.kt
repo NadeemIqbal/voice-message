@@ -56,15 +56,15 @@ import kotlin.time.Duration
  * The composable is a horizontal [Row] designed to sit at the right edge of a chat input bar.
  * What it draws depends on [VoiceRecorderState.phase]:
  *
- * - [VoicePhase.Idle] / [VoicePhase.Sent] — the [idlePlaceholder] slot (typically the consumer's
- *   text field) on the left + a mic button on the right.
- * - [VoicePhase.RecordingHeld] — the placeholder is replaced by a recording indicator: a live
+ * - [VoicePhase.Idle]: the [idlePlaceholder] slot (typically the consumer's text field) on the
+ *   left + a mic button on the right.
+ * - [VoicePhase.RecordingHeld]: the placeholder is replaced by a recording indicator: a live
  *   amplitude waveform built from samples pushed through [VoiceRecorderState.pushAmplitude],
- *   a timer, and a "slide ← to cancel" hint. The mic is highlighted on the right and shows a
+ *   a timer, and a "slide to cancel" hint. The mic is highlighted on the right and shows a
  *   lock chevron above it.
- * - [VoicePhase.Cancelling] — the recording indicator turns red and the hint reads "release to
+ * - [VoicePhase.Cancelling]: the recording indicator turns red and the hint reads "release to
  *   cancel". The user can drag back below the cancel threshold to return to [RecordingHeld].
- * - [VoicePhase.RecordingLocked] — the gesture has ended hands-free. A Cancel "✕" sits on the
+ * - [VoicePhase.RecordingLocked]: the gesture has ended hands-free. A Cancel "x" sits on the
  *   left, the timer in the middle and a Send button (right-pointing arrow) on the right.
  *
  * The gesture is detected with [detectDragGesturesAfterLongPress] on the mic. The state machine
@@ -117,7 +117,7 @@ fun VoiceRecorderInput(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         when (state.phase) {
-            VoicePhase.Idle, VoicePhase.Sent -> {
+            VoicePhase.Idle -> {
                 idlePlaceholder()
                 MicButton(
                     state = state,
