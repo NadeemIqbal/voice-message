@@ -35,9 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.nadeemiqbal.voicemessage.VoiceMessageBubble
 import io.github.nadeemiqbal.voicemessage.VoiceMessageRole
-import io.github.nadeemiqbal.voicemessage.VoicePhase
 import io.github.nadeemiqbal.voicemessage.VoiceRecorderInput
-import io.github.nadeemiqbal.voicemessage.rememberVoiceRecorderState
+import io.github.nadeemiqbal.voicemessage.audio.VoiceAudio
+import io.github.nadeemiqbal.voicemessage.audio.rememberAudioBoundVoiceRecorderState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -123,15 +123,20 @@ private fun ChatScreen() {
         }
     }
 
-    val recorderState = rememberVoiceRecorderState(
-        onCancel = { /* nothing to do — sample has no audio file to delete */ },
-        onSend = { duration, samples ->
+    // Real audio capture, wired in by voice-message-audio. Drops the fake synthesized-amplitude
+    // polling that earlier versions of this sample used. The Desktop / iOS / Web actuals open
+    // the platform mic, drive the live waveform, and hand back a VoiceAudio payload on send.
+    var lastAudio by remember { mutableStateOf<VoiceAudio?>(null) }
+    val recorderState = rememberAudioBoundVoiceRecorderState(
+        onCancel = { /* sample has nowhere to upload, so just drop the audio */ },
+        onSend = { audio, samples ->
+            lastAudio = audio
             val id = nextId++
             messages.add(
                 FakeVoiceMessage(
                     id = id,
                     samples = samples.ifEmpty { randomSamples(seed = id, count = 30, minAmp = 0.1f, maxAmp = 0.9f) },
-                    duration = duration.coerceAtLeast(1.seconds),
+                    duration = audio.duration.coerceAtLeast(1.seconds),
                     role = VoiceMessageRole.Sender,
                 ),
             )
@@ -141,26 +146,6 @@ private fun ChatScreen() {
             }
         },
     )
-
-    // Fake audio capture: while any recording phase is active, push random amplitudes ~20 Hz.
-    LaunchedEffect(recorderState) {
-        var t = 0L
-        while (true) {
-            val phase = recorderState.phase
-            if (phase == VoicePhase.RecordingHeld ||
-                phase == VoicePhase.RecordingLocked ||
-                phase == VoicePhase.Cancelling
-            ) {
-                val envelope = 0.55f + 0.35f * kotlin.math.sin(t * 0.18).toFloat()
-                val noise = Random.nextFloat() * 0.25f
-                recorderState.pushAmplitude((envelope + noise).coerceIn(0.05f, 1f))
-                t++
-            } else {
-                t = 0L
-            }
-            delay(50)
-        }
-    }
 
     Column(
         modifier = Modifier

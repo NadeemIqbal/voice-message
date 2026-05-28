@@ -28,6 +28,7 @@ dependencyResolutionManagement {
 rootProject.name = "voice-message"
 
 include(":voice-message")
+include(":voice-message-audio")
 include(":sample:composeApp")
 include(":sample:androidApp")
 include(":sample:desktopApp")

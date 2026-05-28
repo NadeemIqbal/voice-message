@@ -44,6 +44,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":voice-message"))
+            implementation(project(":voice-message-audio"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
