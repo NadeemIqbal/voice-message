@@ -47,7 +47,10 @@ JavaSound into the state callbacks once and the UX behaves the same everywhere.
 
 ```toml
 [libraries]
-voice-message = { module = "io.github.nadeemiqbal:voice-message", version = "0.2.0" }
+voice-message       = { module = "io.github.nadeemiqbal:voice-message",       version = "0.3.0" }
+# Optional: drop-in mic capture so you do not have to wire MediaRecorder / AVAudioRecorder /
+# JavaSound / browser MediaRecorder yourself. Pair with rememberAudioBoundVoiceRecorderState.
+voice-message-audio = { module = "io.github.nadeemiqbal:voice-message-audio", version = "0.3.0" }
 ```
 
 `commonMain` dependencies:
@@ -243,10 +246,17 @@ Every transition + every edge case is covered by 31 pure-logic test cases in
 - 0.5x playback speed and configurable speed sequences.
 - Tap-vs-hold distinction (`onTap` callback) so consumers can toggle into text-only mode on tap.
 
-### Shipped in v0.2.0 (2026-05-29)
+### Shipped in v0.3.0 (2026-05-29)
 
+- `voice-message-audio` companion artifact: drop-in mic capture for Android, iOS, Desktop, Web.
+  Use `rememberAudioBoundVoiceRecorderState { audio, samples -> ... }` and skip BYO entirely.
+- Critical: recording-cancelled-immediately bug fixed (`MicButton` is now at one stable slot
+  across phase changes, so its pointer-input modifier survives `state.start()` recomposition).
+- Polished waveform: fixed-width bars (default 3dp) regardless of canvas, count adapts to bubble
+  width, row centered when the canvas is wider than the bar layout.
+- Locked-mode strip no longer shows the "Slide to cancel" hint (X / Send buttons are the
+  controls).
 - Scrolling live waveform that actually scrolls.
-- Long-press gesture race fixed (single coroutine, no shared mutable flag).
 - `VoicePhase.Sent` removed (was a stuck terminal phase); `phase` resets to `Idle` synchronously
   after `onSend`.
 - RTL handling: slide-to-cancel direction flips in Arabic / Hebrew / Urdu locales.
