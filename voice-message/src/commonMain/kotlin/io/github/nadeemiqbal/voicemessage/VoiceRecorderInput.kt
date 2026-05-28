@@ -43,8 +43,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -183,6 +185,7 @@ private fun RowScope.RecordingActiveStrip(
         targetValue = 0.3f,
         animationSpec = infiniteRepeatable(tween(durationMillis = 700), RepeatMode.Reverse),
     )
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Row(
         modifier = Modifier
             .weight(1f)
@@ -214,7 +217,11 @@ private fun RowScope.RecordingActiveStrip(
             live = true,
         )
         Text(
-            text = if (cancelling) "Release to cancel" else "← Slide to cancel",
+            text = when {
+                cancelling -> "Release to cancel"
+                isRtl -> "Slide to cancel →"
+                else -> "← Slide to cancel"
+            },
             color = if (cancelling) colors.cancelIconColor else colors.hintTextColor,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.testTag("voice_recorder_hint"),
@@ -236,6 +243,10 @@ private fun MicButton(
     val iconColor by animateColorAsState(
         targetValue = if (isRecording) colors.micActiveColor else colors.micColor,
     )
+    // In RTL the mic sits on the left edge of the input bar, so "slide-to-cancel" is
+    // physically rightward. We flip the sign of dragX before handing it to the FSM, which is
+    // hard-coded to "leftward-negative". The lock direction (slide-up) is unaffected by RTL.
+    val rtlDragSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
     Box(
         modifier = Modifier
             .size(48.dp)
@@ -285,7 +296,7 @@ private fun MicButton(
                             val delta = change.positionChange()
                             dragX += delta.x
                             dragY += delta.y
-                            state.updateDrag(dragX, dragY, lockThresholdPx, cancelThresholdPx)
+                            state.updateDrag(dragX * rtlDragSign, dragY, lockThresholdPx, cancelThresholdPx)
                             change.consume()
                         }
                     } finally {
