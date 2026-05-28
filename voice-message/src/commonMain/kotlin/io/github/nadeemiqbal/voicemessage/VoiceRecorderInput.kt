@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration
 
 /**
  * A WhatsApp/Telegram-style hold-to-record mic with slide-to-lock and slide-to-cancel gestures.
@@ -437,5 +436,3 @@ private fun ChevronUpGlyph(color: Color, size: Dp) {
     }
 }
 
-@Suppress("unused")
-private val _unused: Duration = Duration.ZERO // retain Duration import in case future API additions need it
