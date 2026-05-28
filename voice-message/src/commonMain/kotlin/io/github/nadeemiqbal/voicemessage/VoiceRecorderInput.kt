@@ -46,9 +46,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 
 /**
@@ -248,53 +247,50 @@ private fun MicButton(
                 // Custom hold-to-record gesture. The built-in `detectDragGesturesAfterLongPress`
                 // cancels its long-press timer on the slightest pointer movement (including the
                 // sub-pixel mouse jitter most desktop pointers produce), which made the gesture
-                // unusable on Desktop and Web. Here we own the timer ourselves: a launched
-                // coroutine sleeps `viewConfiguration.longPressTimeoutMillis`, then calls
-                // `state.start()` unconditionally — drag deltas only start to flow into
-                // `state.updateDrag` after the long-press has fired, so jitter during the hold
-                // is harmless.
+                // unusable on Desktop and Web.
+                //
+                // Implementation: one coroutine, two phases. Phase 1 waits with
+                // `withTimeoutOrNull` for either the long-press window to elapse OR the pointer
+                // to release (a tap, which we drop). Phase 2 fires `state.start()` and then
+                // forwards drag deltas to `state.updateDrag` until release. Keeping the timer
+                // inside the event loop instead of a `launch { delay() }` removes the
+                // cross-dispatcher race the previous implementation had between the captured
+                // `started` flag and incoming pointer events.
                 val longPressMs = viewConfiguration.longPressTimeoutMillis
-                // `PointerInputScope` is suspend but not a `CoroutineScope` — wrap in
-                // `coroutineScope { ... }` so we can `launch` the long-press timer alongside the
-                // gesture loop. When the modifier is recomposed or removed, the parent
-                // cancellation propagates through both children automatically.
-                coroutineScope {
-                    val scope = this
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        var dragX = 0f
-                        var dragY = 0f
-                        var started = false
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
 
-                        val longPressJob = scope.launch {
-                            delay(longPressMs)
-                            started = true
-                            state.start()
+                    // Phase 1: long-press window. If the pointer releases during this window
+                    // we treat it as a tap and exit without firing `state.start()`.
+                    val tap: Unit? = withTimeoutOrNull(longPressMs) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                                ?: return@withTimeoutOrNull
+                            if (!change.pressed) return@withTimeoutOrNull
                         }
+                        @Suppress("UNREACHABLE_CODE") Unit
+                    }
+                    if (tap != null) return@awaitEachGesture
 
-                        try {
-                            // Loop until the tracked pointer goes up or out of scope.
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) {
-                                    // Pointer released.
-                                    break
-                                }
-                                if (started) {
-                                    val delta = change.positionChange()
-                                    dragX += delta.x
-                                    dragY += delta.y
-                                    state.updateDrag(dragX, dragY, lockThresholdPx, cancelThresholdPx)
-                                    change.consume()
-                                }
-                            }
-                        } finally {
-                            longPressJob.cancel()
-                            if (started) {
-                                state.release()
-                            }
+                    // Phase 2: long-press elapsed with pointer still down. Start recording and
+                    // forward drags until release.
+                    state.start()
+                    var dragX = 0f
+                    var dragY = 0f
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            val delta = change.positionChange()
+                            dragX += delta.x
+                            dragY += delta.y
+                            state.updateDrag(dragX, dragY, lockThresholdPx, cancelThresholdPx)
+                            change.consume()
                         }
+                    } finally {
+                        state.release()
                     }
                 }
             },
