@@ -13,13 +13,24 @@ import kotlin.time.Duration.Companion.minutes
 /** Default values + factory functions for the voice messaging composables. */
 object VoiceMessageDefaults {
 
-    /** Default number of bars rendered in the waveform. */
-    const val BarCount: Int = 40
+    /**
+     * Default maximum number of bars rendered in the waveform. Treated as an upper bound: the
+     * actual count is capped by what fits in the canvas at [BarWidth] + [BarSpacing] density, so
+     * narrow bubbles draw fewer bars and wide bubbles draw more (up to this cap). Setting this
+     * higher does not make narrow waveforms more dense; setting it lower forces a sparser look.
+     */
+    const val BarCount: Int = 64
+
+    /**
+     * Default bar width. Kept narrow (WhatsApp-style) so high-amplitude bars read as clean tall
+     * pills and low-amplitude bars stay slim instead of degenerating into circles.
+     */
+    val BarWidth: Dp = 3.dp
 
     /** Default gap between bars. */
     val BarSpacing: Dp = 2.dp
 
-    /** Default minimum bar height — keeps very-quiet bars visible. */
+    /** Default minimum bar height. Keeps very-quiet bars visible as small dots, not blank space. */
     val BarMinHeight: Dp = 3.dp
 
     /** Default vertical drag distance from the mic before the recording locks hands-free. */

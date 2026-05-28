@@ -144,7 +144,14 @@ fun VoiceRecorderInput(
                 onClick = { state.cancelFromLock() },
                 testTag = "voice_cancel_button",
             )
-            RecordingActiveStrip(state = state, colors = colors, cancelling = false)
+            // Locked: the explicit Cancel and Send buttons are the controls, so the slide hint
+            // on the inner strip would be misleading. Suppress it.
+            RecordingActiveStrip(
+                state = state,
+                colors = colors,
+                cancelling = false,
+                showSlideHint = false,
+            )
             LockedActionButton(
                 contentDescription = "Send",
                 glyph = { color -> ArrowGlyph(color = color, size = 16.dp) },
@@ -181,6 +188,7 @@ private fun RowScope.RecordingActiveStrip(
     state: VoiceRecorderState,
     colors: VoiceRecorderColors,
     cancelling: Boolean,
+    showSlideHint: Boolean = true,
 ) {
     val recordingIndicatorAlpha by rememberInfiniteTransition().animateFloat(
         initialValue = 1f,
@@ -220,16 +228,21 @@ private fun RowScope.RecordingActiveStrip(
             barColor = if (cancelling) colors.cancelIconColor else colors.waveformColor,
             live = true,
         )
-        Text(
-            text = when {
-                cancelling -> "Release to cancel"
-                isRtl -> "Slide to cancel →"
-                else -> "← Slide to cancel"
-            },
-            color = if (cancelling) colors.cancelIconColor else colors.hintTextColor,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.testTag("voice_recorder_hint"),
-        )
+        // The slide-to-cancel hint is only meaningful while the user's finger is on the mic.
+        // In the locked phase the hint is suppressed because the cancel control is the explicit
+        // X button on the left, not a slide gesture.
+        if (showSlideHint) {
+            Text(
+                text = when {
+                    cancelling -> "Release to cancel"
+                    isRtl -> "Slide to cancel →"
+                    else -> "← Slide to cancel"
+                },
+                color = if (cancelling) colors.cancelIconColor else colors.hintTextColor,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.testTag("voice_recorder_hint"),
+            )
+        }
     }
 }
 
