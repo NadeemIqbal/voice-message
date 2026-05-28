@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import kotlin.time.Duration
 
 /**
@@ -90,7 +91,9 @@ fun VoiceMessageBubble(
             onClick = onPlayPauseToggle,
         )
 
-        // Tappable waveform: converts tap-x to a 0..1 fraction and forwards to onSeek.
+        // Tappable waveform: converts tap-x to a 0..1 fraction snapped to the nearest bar and
+        // forwards to onSeek. The visual played/unplayed split is bar-discrete, so snapping the
+        // returned fraction keeps the seek consistent with what the user sees.
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -102,7 +105,11 @@ fun VoiceMessageBubble(
                 .pointerInput(barCount) {
                     detectTapGestures { offset ->
                         val w = size.width
-                        if (w > 0) onSeek((offset.x / w).coerceIn(0f, 1f))
+                        if (w > 0) {
+                            val raw = (offset.x / w).coerceIn(0f, 1f)
+                            val snapped = (raw * barCount).roundToInt().toFloat() / barCount.toFloat()
+                            onSeek(snapped.coerceIn(0f, 1f))
+                        }
                     }
                 }
                 .testTag("voice_message_waveform"),
