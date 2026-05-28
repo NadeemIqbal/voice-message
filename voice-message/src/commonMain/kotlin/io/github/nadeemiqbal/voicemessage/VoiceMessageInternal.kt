@@ -4,16 +4,36 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Down-samples a list of raw amplitude readings (each `0f..1f`) to exactly [targetCount] bars by
- * grouping consecutive samples into equal-width buckets and taking the **maximum** of each bucket.
+ * How [downsampleAmplitudes] should treat input longer than [targetCount].
  *
- * Max-of-bucket gives a more visually punchy waveform than mean-of-bucket — quiet runs read as
- * quiet but loud peaks still stand out. Returns a zero-filled list of size [targetCount] for an
- * empty input. Caps each value to `0f..1f`.
- *
- * Pure helper — exercised directly by the unit tests, no Compose dependency.
+ * - [Live] keeps only the last [targetCount] samples and discards anything older. Used by the
+ *   live recording strip so the waveform genuinely scrolls from the right as new samples arrive,
+ *   matching WhatsApp / Telegram. Anything shorter than [targetCount] is left-padded with zeros
+ *   so a fresh recording grows from the right edge.
+ * - [Static] keeps the full history and compresses it into [targetCount] bars via max-of-bucket.
+ *   Used by the playback bubble so the bar-split between played and unplayed colours can address
+ *   the entire recording.
  */
-internal fun downsampleAmplitudes(samples: List<Float>, targetCount: Int): List<Float> {
+internal enum class WaveformMode { Live, Static }
+
+/**
+ * Down-samples a list of raw amplitude readings (each `0f..1f`) to exactly [targetCount] bars.
+ *
+ * For [WaveformMode.Static] (default), groups consecutive samples into equal-width buckets and
+ * takes the **maximum** of each bucket. Max-of-bucket gives a more visually punchy waveform than
+ * mean-of-bucket: quiet runs read as quiet but loud peaks still stand out.
+ *
+ * For [WaveformMode.Live], keeps only the last [targetCount] samples (sliding window) so the
+ * displayed bars actually scroll as new samples arrive.
+ *
+ * Returns a zero-filled list of size [targetCount] for an empty input. Caps each value to
+ * `0f..1f`. Pure helper, exercised directly by the unit tests, no Compose dependency.
+ */
+internal fun downsampleAmplitudes(
+    samples: List<Float>,
+    targetCount: Int,
+    mode: WaveformMode = WaveformMode.Static,
+): List<Float> {
     require(targetCount > 0) { "targetCount must be > 0, was $targetCount" }
     if (samples.isEmpty()) return List(targetCount) { 0f }
     if (samples.size <= targetCount) {
@@ -23,16 +43,25 @@ internal fun downsampleAmplitudes(samples: List<Float>, targetCount: Int): List<
             if (i < pad) 0f else samples[i - pad].coerceIn(0f, 1f)
         }
     }
-    val bucketSize = samples.size.toDouble() / targetCount
-    return List(targetCount) { i ->
-        val from = (i * bucketSize).toInt()
-        val to = min(samples.size, ((i + 1) * bucketSize).toInt())
-        var peak = 0f
-        for (j in from until max(to, from + 1)) {
-            val s = samples.getOrNull(j) ?: 0f
-            if (s > peak) peak = s
+    return when (mode) {
+        WaveformMode.Live -> {
+            // Sliding window: emit only the last targetCount samples, in order.
+            val start = samples.size - targetCount
+            List(targetCount) { i -> samples[start + i].coerceIn(0f, 1f) }
         }
-        peak.coerceIn(0f, 1f)
+        WaveformMode.Static -> {
+            val bucketSize = samples.size.toDouble() / targetCount
+            List(targetCount) { i ->
+                val from = (i * bucketSize).toInt()
+                val to = min(samples.size, ((i + 1) * bucketSize).toInt())
+                var peak = 0f
+                for (j in from until max(to, from + 1)) {
+                    val s = samples.getOrNull(j) ?: 0f
+                    if (s > peak) peak = s
+                }
+                peak.coerceIn(0f, 1f)
+            }
+        }
     }
 }
 

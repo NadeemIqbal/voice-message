@@ -207,12 +207,13 @@ private fun RowScope.RecordingActiveStrip(
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.width(48.dp),
         )
-        // Live waveform — the latest BarCount samples, scrolling from the right.
+        // Live waveform: the latest BarCount samples, scrolling from the right.
         VoiceWaveform(
             samples = state.capturedSamples,
             modifier = Modifier.weight(1f).height(28.dp),
             barCount = VoiceMessageDefaults.BarCount,
             barColor = if (cancelling) colors.cancelIconColor else colors.waveformColor,
+            live = true,
         )
         Text(
             text = if (cancelling) "Release to cancel" else "← Slide to cancel",

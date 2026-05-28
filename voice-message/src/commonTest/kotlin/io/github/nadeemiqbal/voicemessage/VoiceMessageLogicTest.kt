@@ -49,6 +49,42 @@ class VoiceMessageLogicTest {
         assertFailsWith<IllegalArgumentException> { downsampleAmplitudes(listOf(0.5f), -1) }
     }
 
+    // ---- downsampleAmplitudes: WaveformMode.Live (B1 regression: scrolling waveform) -------
+
+    @Test
+    fun downsample_liveMode_shorterThanTarget_padsLeftWithZeros() {
+        val out = downsampleAmplitudes(listOf(0.4f, 0.8f, 0.2f), 6, WaveformMode.Live)
+        assertEquals(6, out.size)
+        // Below targetCount, Live and Static behave identically: grow from the right.
+        assertEquals(listOf(0f, 0f, 0f, 0.4f, 0.8f, 0.2f), out)
+    }
+
+    @Test
+    fun downsample_liveMode_longerThanTarget_keepsOnlyLastTargetCount() {
+        // 10 samples, want 4. Live mode should return samples[6..9] without averaging.
+        val samples = listOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f)
+        val out = downsampleAmplitudes(samples, 4, WaveformMode.Live)
+        assertEquals(listOf(0.7f, 0.8f, 0.9f, 1.0f), out)
+    }
+
+    @Test
+    fun downsample_liveMode_equalToTarget_isIdentityClampedTo0to1() {
+        // size == targetCount uses the shared <= branch; clamps out-of-range values.
+        val out = downsampleAmplitudes(listOf(0f, 0.5f, 1f, 1.4f, -0.1f), 5, WaveformMode.Live)
+        assertEquals(listOf(0f, 0.5f, 1f, 1f, 0f), out)
+    }
+
+    @Test
+    fun downsample_staticMode_regressionGuardOnLongSamples() {
+        // Static mode (default) should still take peak-of-bucket on overflow, unchanged
+        // from v0.1.0 behavior. Guard against accidental future regression.
+        val samples = List(40) { i -> if (i % 5 == 0) 0.9f else 0.1f }
+        val outDefault = downsampleAmplitudes(samples, 8)
+        val outExplicit = downsampleAmplitudes(samples, 8, WaveformMode.Static)
+        assertEquals(outExplicit, outDefault)
+        outDefault.forEach { assertEquals(0.9f, it) }
+    }
+
     // ---- phaseFromDrag ------------------------------------------------------------------------
 
     @Test

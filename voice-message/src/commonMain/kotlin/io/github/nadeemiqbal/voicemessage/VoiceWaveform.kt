@@ -19,17 +19,19 @@ import kotlin.math.roundToInt
  *
  * Renders [barCount] vertical rounded bars, each height proportional to a peak-pooled amplitude
  * from [samples] (`0f..1f`). When [progress] is `< 1f`, bars at indices below the progress mark
- * are drawn in [barColor] and the rest in [unplayedColor] — used by the bubble to show playback
+ * are drawn in [barColor] and the rest in [unplayedColor]: used by the bubble to show playback
  * position.
  *
  * @param samples raw amplitude readings, `0f..1f`. Anything longer than [barCount] is down-sampled
- *   via [downsampleAmplitudes] (max-of-bucket).
+ *   via [downsampleAmplitudes] (max-of-bucket for [live] = false, sliding-window for [live] = true).
  * @param progress how much of the waveform has "played", in `0f..1f`. Bars at indices `< barCount * progress`
  *   use [barColor]; the rest use [unplayedColor]. Pass `1f` for a fully-coloured static waveform.
  * @param barColor colour of the played / fully-rendered bars.
  * @param unplayedColor colour of the unplayed bars; ignored when [progress] is `>= 1f`.
- * @param minBarHeightFraction the minimum height of any bar as a fraction of the canvas height,
- *   so very-quiet samples still read as bars and not blank space.
+ * @param live when `true`, only the latest [barCount] samples are visible and the waveform
+ *   scrolls right-to-left as new samples arrive. Used by the live recording strip. Defaults to
+ *   `false` (static waveform addressing the full history), which is what the playback bubble
+ *   wants.
  */
 @Composable
 fun VoiceWaveform(
@@ -41,11 +43,13 @@ fun VoiceWaveform(
     minBarHeight: Dp = VoiceMessageDefaults.BarMinHeight,
     progress: Float = 1f,
     unplayedColor: Color = barColor,
+    live: Boolean = false,
 ) {
     val density = LocalDensity.current
     val barSpacingPx = with(density) { barSpacing.toPx() }
     val minBarHeightPx = with(density) { minBarHeight.toPx() }
-    val bars = remember(samples, barCount) { downsampleAmplitudes(samples, barCount) }
+    val mode = if (live) WaveformMode.Live else WaveformMode.Static
+    val bars = remember(samples, barCount, mode) { downsampleAmplitudes(samples, barCount, mode) }
     val splitIndex = (barCount * progress.coerceIn(0f, 1f)).roundToInt().coerceIn(0, barCount)
 
     Canvas(modifier = modifier) {
