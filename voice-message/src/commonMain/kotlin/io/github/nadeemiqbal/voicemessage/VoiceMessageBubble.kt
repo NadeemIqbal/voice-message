@@ -25,6 +25,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration
@@ -86,11 +90,15 @@ fun VoiceMessageBubble(
             onClick = onPlayPauseToggle,
         )
 
-        // Tappable waveform — converts tap-x to a 0..1 fraction and forwards to onSeek.
+        // Tappable waveform: converts tap-x to a 0..1 fraction and forwards to onSeek.
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(36.dp)
+                .semantics {
+                    contentDescription = "Voice message, ${formatVoiceDuration(duration)}, tap to seek"
+                    this.role = Role.Button
+                }
                 .pointerInput(barCount) {
                     detectTapGestures { offset ->
                         val w = size.width
@@ -134,23 +142,28 @@ private fun SpeedChip(
     backgroundColor: Color,
     onCycle: () -> Unit,
 ) {
+    val speedLabel = VoiceMessageDefaults.formatPlaybackSpeed(speed)
     Box(
         modifier = Modifier
             .background(backgroundColor, RoundedCornerShape(10.dp))
+            .semantics {
+                contentDescription = "Playback speed $speedLabel, tap to change"
+                role = Role.Button
+            }
             .pointerInput(Unit) { detectTapGestures(onTap = { onCycle() }) }
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .testTag("voice_message_speed_chip"),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = VoiceMessageDefaults.formatPlaybackSpeed(speed),
+            text = speedLabel,
             color = contentColor,
             style = MaterialTheme.typography.labelSmall,
         )
     }
 }
 
-/** Circular play/pause button with a hand-drawn icon — keeps the library icon-dependency-free. */
+/** Circular play/pause button with a hand-drawn icon. Keeps the library icon-dependency-free. */
 @Composable
 private fun PlayPauseButton(
     isPlaying: Boolean,
@@ -158,10 +171,15 @@ private fun PlayPauseButton(
     backgroundColor: Color,
     onClick: () -> Unit,
 ) {
+    val description = if (isPlaying) "Pause voice message" else "Play voice message"
     Box(
         modifier = Modifier
             .size(36.dp)
             .background(backgroundColor, CircleShape)
+            .semantics {
+                contentDescription = description
+                role = Role.Button
+            }
             .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
             .testTag(if (isPlaying) "voice_pause_button" else "voice_play_button"),
         contentAlignment = Alignment.Center,

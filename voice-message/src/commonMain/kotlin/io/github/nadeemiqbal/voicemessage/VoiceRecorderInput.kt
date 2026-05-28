@@ -45,6 +45,13 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -206,7 +213,9 @@ private fun RowScope.RecordingActiveStrip(
             text = formatVoiceDuration(state.elapsed),
             color = colors.timerColor,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.width(48.dp),
+            modifier = Modifier
+                .width(48.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
         )
         // Live waveform: the latest BarCount samples, scrolling from the right.
         VoiceWaveform(
@@ -247,12 +256,23 @@ private fun MicButton(
     // physically rightward. We flip the sign of dragX before handing it to the FSM, which is
     // hard-coded to "leftward-negative". The lock direction (slide-up) is unaffected by RTL.
     val rtlDragSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
+    val micPhaseDescription = when (state.phase) {
+        VoicePhase.RecordingHeld -> "Recording"
+        VoicePhase.RecordingLocked -> "Recording locked"
+        VoicePhase.Cancelling -> "Sliding to cancel"
+        VoicePhase.Idle -> "Idle"
+    }
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
             .background(bgColor)
             .testTag("voice_mic_button")
+            .semantics {
+                contentDescription = "Hold to record voice message"
+                role = Role.Button
+                stateDescription = micPhaseDescription
+            }
             .pointerInput(state, lockThresholdPx, cancelThresholdPx) {
                 // Custom hold-to-record gesture. The built-in `detectDragGesturesAfterLongPress`
                 // cancels its long-press timer on the slightest pointer movement (including the
@@ -329,20 +349,21 @@ private fun LockedActionButton(
     onClick: () -> Unit,
     testTag: String,
 ) {
+    val description = contentDescription
     Box(
         modifier = Modifier
             .size(44.dp)
             .clip(CircleShape)
             .background(background)
+            .semantics {
+                this.contentDescription = description
+                role = Role.Button
+            }
             .pointerInput(onClick) { detectTapGestures(onTap = { onClick() }) }
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
         glyph(iconColor)
-        // Unused parameter — accessibility plumbing would normally add a contentDescription
-        // semantic; left as a hook for future a11y work.
-        @Suppress("UnusedExpression")
-        contentDescription
     }
 }
 
