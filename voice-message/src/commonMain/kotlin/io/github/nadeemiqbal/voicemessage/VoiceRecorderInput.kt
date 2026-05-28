@@ -125,59 +125,53 @@ fun VoiceRecorderInput(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        when (state.phase) {
-            VoicePhase.Idle -> {
-                idlePlaceholder()
-                MicButton(
-                    state = state,
-                    colors = colors,
-                    lockThresholdPx = lockThresholdPx,
-                    cancelThresholdPx = cancelThresholdPx,
-                    isRecording = false,
-                )
+        // IMPORTANT: the MicButton must stay at one stable source position across the
+        // {Idle, RecordingHeld, Cancelling} phases. If it lived inside per-phase when-branches,
+        // Compose's slot table would dispose and re-mount it on every phase transition,
+        // tearing down its `.pointerInput { ... }` modifier mid-gesture. The torn-down
+        // gesture coroutine's `finally { state.release() }` would then fire with elapsed ~= 0ms,
+        // the FSM would resolve that to `TooShort`, and every recording would be silently
+        // dropped one frame after `state.start()`. So: the LEFT content varies by phase, the
+        // RIGHT MicButton is at one fixed position in the else-branch. Only the
+        // RecordingLocked phase (which has no MicButton, just Send / Cancel buttons) is
+        // structurally different.
+        if (state.phase == VoicePhase.RecordingLocked) {
+            LockedActionButton(
+                contentDescription = "Cancel",
+                glyph = { color -> CrossGlyph(color = color, size = 16.dp) },
+                background = Color.Transparent,
+                iconColor = colors.cancelIconColor,
+                onClick = { state.cancelFromLock() },
+                testTag = "voice_cancel_button",
+            )
+            RecordingActiveStrip(state = state, colors = colors, cancelling = false)
+            LockedActionButton(
+                contentDescription = "Send",
+                glyph = { color -> ArrowGlyph(color = color, size = 16.dp) },
+                background = colors.sendButtonColor,
+                iconColor = colors.sendButtonContentColor,
+                onClick = { state.sendFromLock() },
+                testTag = "voice_send_button",
+            )
+        } else {
+            // Left content: placeholder when idle, active strip otherwise. The when sits at a
+            // fixed slot; only its visual contents change as phase moves through
+            // {Idle, RecordingHeld, Cancelling}.
+            when (state.phase) {
+                VoicePhase.Idle -> idlePlaceholder()
+                VoicePhase.RecordingHeld -> RecordingActiveStrip(state = state, colors = colors, cancelling = false)
+                VoicePhase.Cancelling -> RecordingActiveStrip(state = state, colors = colors, cancelling = true)
+                VoicePhase.RecordingLocked -> Unit // unreachable in this branch
             }
-
-            VoicePhase.RecordingHeld -> {
-                RecordingActiveStrip(state = state, colors = colors, cancelling = false)
-                MicButton(
-                    state = state,
-                    colors = colors,
-                    lockThresholdPx = lockThresholdPx,
-                    cancelThresholdPx = cancelThresholdPx,
-                    isRecording = true,
-                )
-            }
-
-            VoicePhase.Cancelling -> {
-                RecordingActiveStrip(state = state, colors = colors, cancelling = true)
-                MicButton(
-                    state = state,
-                    colors = colors,
-                    lockThresholdPx = lockThresholdPx,
-                    cancelThresholdPx = cancelThresholdPx,
-                    isRecording = true,
-                )
-            }
-
-            VoicePhase.RecordingLocked -> {
-                LockedActionButton(
-                    contentDescription = "Cancel",
-                    glyph = { color -> CrossGlyph(color = color, size = 16.dp) },
-                    background = Color.Transparent,
-                    iconColor = colors.cancelIconColor,
-                    onClick = { state.cancelFromLock() },
-                    testTag = "voice_cancel_button",
-                )
-                RecordingActiveStrip(state = state, colors = colors, cancelling = false)
-                LockedActionButton(
-                    contentDescription = "Send",
-                    glyph = { color -> ArrowGlyph(color = color, size = 16.dp) },
-                    background = colors.sendButtonColor,
-                    iconColor = colors.sendButtonContentColor,
-                    onClick = { state.sendFromLock() },
-                    testTag = "voice_send_button",
-                )
-            }
+            // Single stable MicButton instance for all three phases. Compose preserves its slot
+            // identity (and therefore its pointer-input modifier) across phase transitions.
+            MicButton(
+                state = state,
+                colors = colors,
+                lockThresholdPx = lockThresholdPx,
+                cancelThresholdPx = cancelThresholdPx,
+                isRecording = state.phase != VoicePhase.Idle,
+            )
         }
     }
 }
