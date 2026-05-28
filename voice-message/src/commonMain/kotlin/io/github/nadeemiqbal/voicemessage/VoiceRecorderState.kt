@@ -32,6 +32,7 @@ class VoiceRecorderState internal constructor(
     private val onStart: () -> Unit,
     private val onCancel: () -> Unit,
     private val onSend: (Duration, List<Float>) -> Unit,
+    private val onHaptic: (VoiceHaptic) -> Unit,
     private val minDuration: Duration,
     private val maxDuration: Duration,
     private val timeSource: TimeSource = TimeSource.Monotonic,
@@ -71,6 +72,7 @@ class VoiceRecorderState internal constructor(
         elapsedState = Duration.ZERO
         startMark = timeSource.markNow()
         phaseState = VoicePhase.RecordingHeld
+        onHaptic(VoiceHaptic.Start)
         onStart()
     }
 
@@ -106,8 +108,17 @@ class VoiceRecorderState internal constructor(
         lockThresholdPx: Float,
         cancelThresholdPx: Float,
     ) {
-        val next = phaseFromDrag(phaseState, dragX, dragY, lockThresholdPx, cancelThresholdPx)
-        if (next != phaseState) phaseState = next
+        val previous = phaseState
+        val next = phaseFromDrag(previous, dragX, dragY, lockThresholdPx, cancelThresholdPx)
+        if (next != previous) {
+            phaseState = next
+            // Rising-edge haptics on the two interesting threshold crossings.
+            when {
+                next == VoicePhase.RecordingLocked -> onHaptic(VoiceHaptic.Lock)
+                next == VoicePhase.Cancelling && previous == VoicePhase.RecordingHeld ->
+                    onHaptic(VoiceHaptic.CrossCancel)
+            }
+        }
     }
 
     /**
@@ -156,11 +167,13 @@ class VoiceRecorderState internal constructor(
         // Reset to Idle before firing the callback so any observer that re-reads `phase` from
         // inside `onSend` sees the resting state, not a stuck terminal phase.
         phaseState = VoicePhase.Idle
+        onHaptic(VoiceHaptic.Send)
         onSend(dur, captured)
     }
 
     private fun triggerCancel() {
         resetToIdle()
+        onHaptic(VoiceHaptic.Cancel)
         onCancel()
     }
 
@@ -179,6 +192,11 @@ class VoiceRecorderState internal constructor(
  * @param onCancel fires when the recording is discarded (cancel slide, force-cancel).
  * @param onSend fires when the recording is delivered, with the total elapsed duration and the
  *   list of amplitude samples the consumer fed into [VoiceRecorderState.pushAmplitude].
+ * @param onHaptic fires on phase transitions: `Start` on long-press, `Lock` on crossing the lock
+ *   threshold, `CrossCancel` on crossing the cancel threshold, `Cancel` on a discarded recording,
+ *   `Send` on a delivered recording. Defaults to the platform's native emitter via
+ *   [rememberVoiceHaptics]. Pass `{}` to disable haptics, or a custom callback to fan out to a
+ *   haptics library you already use.
  * @param minDuration releases shorter than this are silently discarded (a tap, not a hold).
  * @param maxDuration upper bound on a single recording; auto-finishes with Send when reached.
  */
@@ -187,6 +205,7 @@ fun rememberVoiceRecorderState(
     onStart: () -> Unit = {},
     onCancel: () -> Unit = {},
     onSend: (Duration, List<Float>) -> Unit,
+    onHaptic: (VoiceHaptic) -> Unit = rememberVoiceHaptics(),
     minDuration: Duration = VoiceMessageDefaults.MinDuration,
     maxDuration: Duration = VoiceMessageDefaults.MaxDuration,
 ): VoiceRecorderState = remember(minDuration, maxDuration) {
@@ -194,6 +213,7 @@ fun rememberVoiceRecorderState(
         onStart = onStart,
         onCancel = onCancel,
         onSend = onSend,
+        onHaptic = onHaptic,
         minDuration = minDuration,
         maxDuration = maxDuration,
     )

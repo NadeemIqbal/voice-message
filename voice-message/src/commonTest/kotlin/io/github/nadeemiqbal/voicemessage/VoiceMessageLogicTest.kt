@@ -85,6 +85,43 @@ class VoiceMessageLogicTest {
         outDefault.forEach { assertEquals(0.9f, it) }
     }
 
+    // ---- Haptic emission (G2) --------------------------------------------------------------
+
+    @Test
+    fun state_emitsHapticsOnEveryPhaseTransition() {
+        val time = TestTimeSource()
+        val emitted = mutableListOf<VoiceHaptic>()
+        val state = newState(time = time, onHaptic = { emitted.add(it) })
+
+        // Start -> RecordingHeld: VoiceHaptic.Start
+        state.start()
+        // Cross-cancel: RecordingHeld -> Cancelling: VoiceHaptic.CrossCancel
+        state.updateDrag(dragX = -200f, dragY = 0f, lockThresholdPx = 80f, cancelThresholdPx = 80f)
+        // Drift back below cancel threshold: Cancelling -> RecordingHeld (no haptic).
+        state.updateDrag(dragX = 0f, dragY = 0f, lockThresholdPx = 80f, cancelThresholdPx = 80f)
+        // Cross lock threshold: RecordingHeld -> RecordingLocked: VoiceHaptic.Lock
+        state.updateDrag(dragX = 0f, dragY = -200f, lockThresholdPx = 80f, cancelThresholdPx = 80f)
+        // Send from lock: VoiceHaptic.Send
+        time += 1.seconds
+        state.tick()
+        state.sendFromLock()
+        assertEquals(
+            listOf(VoiceHaptic.Start, VoiceHaptic.CrossCancel, VoiceHaptic.Lock, VoiceHaptic.Send),
+            emitted,
+        )
+    }
+
+    @Test
+    fun state_emitsCancelHapticOnForceCancel() {
+        val time = TestTimeSource()
+        val emitted = mutableListOf<VoiceHaptic>()
+        val state = newState(time = time, onHaptic = { emitted.add(it) })
+        state.start()
+        emitted.clear() // discard the Start tick
+        state.forceCancel()
+        assertEquals(listOf(VoiceHaptic.Cancel), emitted)
+    }
+
     // ---- phaseFromDrag ------------------------------------------------------------------------
 
     @Test
@@ -332,6 +369,7 @@ class VoiceMessageLogicTest {
         onStart: () -> Unit = {},
         onCancel: () -> Unit = {},
         onSend: (Duration, List<Float>) -> Unit = { _, _ -> },
+        onHaptic: (VoiceHaptic) -> Unit = {},
         minDuration: Duration = 500.milliseconds,
         maxDuration: Duration = 5.seconds,
         time: TestTimeSource = TestTimeSource(),
@@ -339,6 +377,7 @@ class VoiceMessageLogicTest {
         onStart = onStart,
         onCancel = onCancel,
         onSend = onSend,
+        onHaptic = onHaptic,
         minDuration = minDuration,
         maxDuration = maxDuration,
         timeSource = time,
