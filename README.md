@@ -47,7 +47,7 @@ JavaSound into the state callbacks once and the UX behaves the same everywhere.
 
 ```toml
 [libraries]
-voice-message = { module = "io.github.nadeemiqbal:voice-message", version = "0.1.0" }
+voice-message = { module = "io.github.nadeemiqbal:voice-message", version = "0.2.0" }
 ```
 
 `commonMain` dependencies:
@@ -234,10 +234,25 @@ Every transition + every edge case is covered by 31 pure-logic test cases in
 
 ## Roadmap
 
+- v0.3 ("batteries included"): companion artifact `voice-message-audio` with `expect/actual`
+  audio adapters that close the BYO gap: Android `MediaRecorder`, iOS `AVAudioRecorder`, Desktop
+  `javax.sound.sampled`, Web `MediaRecorder` API. Permission helpers and system-interrupt
+  observers included.
 - Optional speech-bubble pointer between bubble and avatar.
-- Built-in `expect/actual` audio adapters as an opt-in companion artifact.
 - Per-bar amplitude animation on append (the bars grow into place).
-- Haptic feedback on lock / cancel transitions.
+- 0.5x playback speed and configurable speed sequences.
+- Tap-vs-hold distinction (`onTap` callback) so consumers can toggle into text-only mode on tap.
+
+### Shipped in v0.2.0 (2026-05-29)
+
+- Scrolling live waveform that actually scrolls.
+- Long-press gesture race fixed (single coroutine, no shared mutable flag).
+- `VoicePhase.Sent` removed (was a stuck terminal phase); `phase` resets to `Idle` synchronously
+  after `onSend`.
+- RTL handling: slide-to-cancel direction flips in Arabic / Hebrew / Urdu locales.
+- Full accessibility: `semantics`, `contentDescription`, `Role.Button`, `LiveRegionMode.Polite`
+  on the timer.
+- Haptic feedback via `rememberVoiceHaptics()` with per-platform actuals.
 
 ## Contributing
 
