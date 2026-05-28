@@ -60,6 +60,13 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }
+        val androidMain by getting {
+            dependencies {
+                // LocalContext lives in compose.ui; the Android actual reads it to scope the
+                // MediaRecorder's temp-file to the host's cacheDir.
+                implementation(compose.ui)
+            }
+        }
     }
 }
 
