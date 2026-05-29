@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -255,6 +257,9 @@ private fun RowScope.RecordingActiveStrip(
  * [VoiceRecorderState.capturedSamples]) to render a recording strip elsewhere in your layout.
  *
  * @param showLockChevron draws the small slide-up-to-lock hint above the mic while recording.
+ * @param icon optional mic icon. When `null` (default) the library's hand-drawn, dependency-free
+ *   mic glyph is used. Pass an [ImageVector] (e.g. `Icons.Filled.Mic`) to use your own, so the
+ *   mic can match a host design system. Tinted by [colors] like the default glyph.
  */
 @Composable
 fun VoiceMicButton(
@@ -264,6 +269,7 @@ fun VoiceMicButton(
     lockThresholdDp: Dp = VoiceMessageDefaults.LockThreshold,
     cancelThresholdDp: Dp = VoiceMessageDefaults.CancelThreshold,
     showLockChevron: Boolean = true,
+    icon: ImageVector? = null,
 ) {
     val density = LocalDensity.current
     val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
@@ -348,7 +354,16 @@ fun VoiceMicButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        MicGlyph(color = iconColor, size = 22.dp)
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp),
+            )
+        } else {
+            MicGlyph(color = iconColor, size = 22.dp)
+        }
         if (isRecording && showLockChevron) {
             // Small lock chevron above the mic — hints at slide-up-to-lock.
             Box(
