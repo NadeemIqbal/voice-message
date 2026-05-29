@@ -228,7 +228,7 @@ private fun startRecordingSessionJs(
             .catch(function(err) {
                 callback(null, err && err.message ? err.message : 'getUserMedia rejected');
             });
-    })();
+    })()
     """
 )
 
@@ -239,7 +239,7 @@ private fun sessionIsRecordingJs(id: Int): Boolean = js(
         if (!table) return false;
         var s = table.map[id];
         return !!(s && s.recording);
-    })();
+    })()
     """
 )
 
@@ -257,7 +257,7 @@ private fun sessionReadAmplitudeJs(id: Int): Float = js(
             sumSq += v * v;
         }
         return Math.sqrt(sumSq / s.buffer.length);
-    })();
+    })()
     """
 )
 
@@ -304,7 +304,7 @@ private fun sessionStopJs(
         } else {
             finalize();
         }
-    })();
+    })()
     """
 )
 
@@ -320,7 +320,7 @@ private fun sessionCancelJs(id: Int): Unit = js(
         try { s.stream.getTracks().forEach(function(t) { t.stop(); }); } catch (_) {}
         try { s.ctx.close(); } catch (_) {}
         delete table.map[id];
-    })();
+    })()
     """
 )
 
