@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-29
+
+### Fixed
+
+- **Wasm sample failed to load** with `Module parse failed: Unexpected token` in the generated
+  `*.import-object.mjs`. The `js("...")` blocks in `voice-message-audio`'s wasmJs source ended
+  their IIFEs with `})();`; Kotlin/Wasm wraps each `js()` body into an arrow function inside a
+  JS object literal, where the trailing `;` becomes a stray statement separator and breaks the
+  parse. Dropped the terminators. Any consumer building `voice-message-audio` for wasmJs (e.g.
+  through `prompt-bar-voice`) needs this.
+
+### Added
+
+- **`VoiceMicButton`** is now a public composable. Previously the hold-to-record mic was a
+  private piece of `VoiceRecorderInput`. Exposing it lets you build custom composers, e.g. a
+  chat input bar whose send button morphs into a mic when the text field is empty. Pair it with
+  `VoiceWaveform` (driven by `VoiceRecorderState.capturedSamples`) to render the recording strip
+  wherever your layout wants it. Takes a `showLockChevron` flag to suppress the slide-up hint.
+
 ## [0.3.0] - 2026-05-29
 
 This release bundles the v0.2 correctness pass with the v0.3 "batteries included" companion

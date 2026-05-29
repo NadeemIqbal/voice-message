@@ -100,9 +100,8 @@ fun VoiceRecorderInput(
     cancelThresholdDp: Dp = VoiceMessageDefaults.CancelThreshold,
     idlePlaceholder: @Composable RowScope.() -> Unit = { Spacer(Modifier.weight(1f)) },
 ) {
-    val density = LocalDensity.current
-    val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
-    val cancelThresholdPx = with(density) { cancelThresholdDp.toPx() }
+    // Threshold px conversion now lives inside VoiceMicButton; VoiceRecorderInput just forwards
+    // the Dp values through.
 
     // Drive elapsed time + the maxDuration auto-finish while any recording phase is active.
     LaunchedEffect(state) {
@@ -170,14 +169,13 @@ fun VoiceRecorderInput(
                 VoicePhase.Cancelling -> RecordingActiveStrip(state = state, colors = colors, cancelling = true)
                 VoicePhase.RecordingLocked -> Unit // unreachable in this branch
             }
-            // Single stable MicButton instance for all three phases. Compose preserves its slot
-            // identity (and therefore its pointer-input modifier) across phase transitions.
-            MicButton(
+            // Single stable VoiceMicButton instance for all three phases. Compose preserves its
+            // slot identity (and therefore its pointer-input modifier) across phase transitions.
+            VoiceMicButton(
                 state = state,
                 colors = colors,
-                lockThresholdPx = lockThresholdPx,
-                cancelThresholdPx = cancelThresholdPx,
-                isRecording = state.phase != VoicePhase.Idle,
+                lockThresholdDp = lockThresholdDp,
+                cancelThresholdDp = cancelThresholdDp,
             )
         }
     }
@@ -246,14 +244,31 @@ private fun RowScope.RecordingActiveStrip(
     }
 }
 
+/**
+ * The hold-to-record mic button, exposed publicly so it can be embedded in custom composers
+ * (for example a chat input bar that morphs a send button into a mic when the text field is
+ * empty). Drives the same [VoiceRecorderState] gesture machine that [VoiceRecorderInput] uses:
+ * long-press to start, slide up past [lockThresholdDp] to lock hands-free, slide toward the
+ * cancel edge past [cancelThresholdDp] to arm cancel-on-release.
+ *
+ * Place this wherever you want the mic to live; pair it with [VoiceWaveform] (driven by
+ * [VoiceRecorderState.capturedSamples]) to render a recording strip elsewhere in your layout.
+ *
+ * @param showLockChevron draws the small slide-up-to-lock hint above the mic while recording.
+ */
 @Composable
-private fun MicButton(
+fun VoiceMicButton(
     state: VoiceRecorderState,
-    colors: VoiceRecorderColors,
-    lockThresholdPx: Float,
-    cancelThresholdPx: Float,
-    isRecording: Boolean,
+    modifier: Modifier = Modifier,
+    colors: VoiceRecorderColors = VoiceMessageDefaults.recorderColors(),
+    lockThresholdDp: Dp = VoiceMessageDefaults.LockThreshold,
+    cancelThresholdDp: Dp = VoiceMessageDefaults.CancelThreshold,
+    showLockChevron: Boolean = true,
 ) {
+    val density = LocalDensity.current
+    val lockThresholdPx = with(density) { lockThresholdDp.toPx() }
+    val cancelThresholdPx = with(density) { cancelThresholdDp.toPx() }
+    val isRecording = state.phase != VoicePhase.Idle
     val bgColor by animateColorAsState(
         targetValue = if (isRecording) colors.micActiveColor.copy(alpha = 0.22f) else Color.Transparent,
     )
@@ -271,7 +286,7 @@ private fun MicButton(
         VoicePhase.Idle -> "Idle"
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
             .background(bgColor)
@@ -334,7 +349,7 @@ private fun MicButton(
         contentAlignment = Alignment.Center,
     ) {
         MicGlyph(color = iconColor, size = 22.dp)
-        if (isRecording) {
+        if (isRecording && showLockChevron) {
             // Small lock chevron above the mic — hints at slide-up-to-lock.
             Box(
                 modifier = Modifier
