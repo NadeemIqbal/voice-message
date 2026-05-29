@@ -65,6 +65,10 @@ private data class FakeVoiceMessage(
     val samples: List<Float>,
     val duration: Duration,
     val role: VoiceMessageRole,
+    // The real recording bytes from voice-message-audio. `null` for the seeded demo bubbles
+    // (which have no audio file backing them); set to a real VoiceAudio for any bubble the
+    // user produced via the recorder. The sample's SamplePlayer reads this on tap-play.
+    val audio: io.github.nadeemiqbal.voicemessage.audio.VoiceAudio? = null,
 )
 
 @Composable
@@ -96,17 +100,22 @@ private fun ChatScreen() {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    // Single-track playback: only one bubble plays at a time. Toggling another pauses any current.
+    // Single-track playback: only one bubble plays at a time. Toggling another pauses any
+    // current. The playback is real (HTMLAudioElement on Web, javax.sound.sampled.Clip on
+    // Desktop, AVAudioPlayer on iOS, MediaPlayer on Android) for bubbles that carry a captured
+    // VoiceAudio. The seeded demo bubbles have no audio and just animate progress visually.
+    val player = rememberSamplePlayer()
     var currentlyPlayingId by remember { mutableStateOf<Int?>(null) }
     val progresses = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
     val speeds = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
 
-    // Playback simulator — drives the progress of whichever bubble is currently playing, at the
-    // currently-selected speed (cycled via the speed chip). When progress hits 1f, playback
-    // resets and the bubble returns to Idle.
+    // For seeded bubbles (no real audio), keep the visual progress animation so the demo
+    // doesn't feel dead. Real-audio bubbles bypass this loop entirely; their progress comes
+    // from the SamplePlayer's onProgress callback set in onPlayPauseToggle below.
     LaunchedEffect(currentlyPlayingId) {
         val id = currentlyPlayingId ?: return@LaunchedEffect
         val msg = messages.firstOrNull { it.id == id } ?: return@LaunchedEffect
+        if (msg.audio != null) return@LaunchedEffect // real audio drives its own progress
         val totalMs = msg.duration.inWholeMilliseconds.coerceAtLeast(500L)
         val stepMs = 50L
         while (currentlyPlayingId == id) {
@@ -126,11 +135,9 @@ private fun ChatScreen() {
     // Real audio capture, wired in by voice-message-audio. Drops the fake synthesized-amplitude
     // polling that earlier versions of this sample used. The Desktop / iOS / Web actuals open
     // the platform mic, drive the live waveform, and hand back a VoiceAudio payload on send.
-    var lastAudio by remember { mutableStateOf<VoiceAudio?>(null) }
     val recorderState = rememberAudioBoundVoiceRecorderState(
         onCancel = { /* sample has nowhere to upload, so just drop the audio */ },
         onSend = { audio, samples ->
-            lastAudio = audio
             val id = nextId++
             messages.add(
                 FakeVoiceMessage(
@@ -138,6 +145,7 @@ private fun ChatScreen() {
                     samples = samples.ifEmpty { randomSamples(seed = id, count = 30, minAmp = 0.1f, maxAmp = 0.9f) },
                     duration = audio.duration.coerceAtLeast(1.seconds),
                     role = VoiceMessageRole.Sender,
+                    audio = audio, // keeps the real bytes so playback can actually play them
                 ),
             )
             scope.launch {
@@ -194,9 +202,40 @@ private fun ChatScreen() {
                         isPlaying = currentlyPlayingId == msg.id,
                         progress = progresses[msg.id] ?: 0f,
                         onPlayPauseToggle = {
-                            currentlyPlayingId = if (currentlyPlayingId == msg.id) null else msg.id
+                            val nowPlaying = currentlyPlayingId == msg.id
+                            // Always stop any currently-playing real-audio bubble before starting
+                            // a new one; the SamplePlayer is single-track.
+                            player.stop()
+                            if (nowPlaying) {
+                                currentlyPlayingId = null
+                            } else {
+                                currentlyPlayingId = msg.id
+                                progresses[msg.id] = 0f
+                                val audio = msg.audio
+                                if (audio != null) {
+                                    // Real captured audio: hand to platform player. progress
+                                    // updates flow back via the SamplePlayer's onProgress; onFinish
+                                    // resets the bubble to Idle when the file plays out naturally.
+                                    player.play(
+                                        audio = audio,
+                                        onProgress = { f -> progresses[msg.id] = f.coerceIn(0f, 1f) },
+                                        onFinish = {
+                                            progresses[msg.id] = 0f
+                                            if (currentlyPlayingId == msg.id) currentlyPlayingId = null
+                                        },
+                                    )
+                                }
+                                // For seeded bubbles (audio == null), the LaunchedEffect above
+                                // handles the visual-progress animation; no SamplePlayer call.
+                            }
                         },
-                        onSeek = { f -> progresses[msg.id] = f.coerceIn(0f, 1f) },
+                        onSeek = { f ->
+                            val clamped = f.coerceIn(0f, 1f)
+                            progresses[msg.id] = clamped
+                            if (msg.audio != null && currentlyPlayingId == msg.id) {
+                                player.seek(clamped)
+                            }
+                        },
                         role = msg.role,
                         playbackSpeed = speeds[msg.id] ?: 1f,
                         onPlaybackSpeedChange = { newSpeed -> speeds[msg.id] = newSpeed },
