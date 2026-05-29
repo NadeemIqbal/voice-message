@@ -5,8 +5,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import io.github.nadeemiqbal.voicemessage.VoiceMessageDefaults
+import io.github.nadeemiqbal.voicemessage.VoicePhase
 import io.github.nadeemiqbal.voicemessage.VoiceRecorderState
 import io.github.nadeemiqbal.voicemessage.rememberVoiceRecorderState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 
@@ -61,6 +63,17 @@ fun rememberAudioBoundVoiceRecorderState(
     LaunchedEffect(state, capture) {
         capture.amplitudes.collect { amplitude ->
             state.pushAmplitude(amplitude)
+        }
+    }
+
+    // Drive the elapsed-time counter (and the maxDuration auto-finish) while recording. Without
+    // this, `state.elapsed` never advances unless the consumer also renders VoiceRecorderInput
+    // (which has its own ticker). Custom composers built on VoiceMicButton + VoiceWaveform rely
+    // on this ticker so their timer isn't stuck at 0:00.
+    LaunchedEffect(state) {
+        while (true) {
+            if (state.phase != VoicePhase.Idle) state.tick()
+            delay(33L) // ~30 Hz
         }
     }
 
